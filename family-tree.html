@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Family Tree</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cream:    #F8F4EE;
+    --parchment:#EDE5D8;
+    --brown:    #5C3D2E;
+    --brown-lt: #8B6350;
+    --rose:     #C97B84;
+    --rose-lt:  #EAB8BE;
+    --sky:      #6A9AB0;
+    --sky-lt:   #B8D4E0;
+    --ink:      #2B1F17;
+    --ink-lt:   #6B5344;
+    --gold:     #C9A84C;
+    --border:   #D4C4B0;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--cream);
+    color: var(--ink);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Header ── */
+  header {
+    background: var(--brown);
+    color: var(--cream);
+    padding: 1.1rem 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 2px 12px rgba(44,20,10,.25);
+    position: relative;
+    z-index: 10;
+  }
+  header h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: .02em;
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+  }
+  header h1 span.leaf { font-size: 1.3rem; }
+  .header-legend {
+    display: flex;
+    gap: 1.2rem;
+    align-items: center;
+    font-size: .78rem;
+    font-weight: 300;
+    color: #D4C4B0;
+  }
+  .header-legend .li { display: flex; align-items: center; gap: .4rem; }
+  .swatch { width: 13px; height: 13px; border-radius: 3px; border: 1px solid; display: inline-block; }
+  .sw-m { background: #BFD8E8; border-color: var(--sky); }
+  .sw-f { background: #EBC8CC; border-color: var(--rose); }
+  .sw-sp { width: 18px; height: 0; border: none; border-top: 2px dashed var(--rose); display: inline-block; }
+
+  /* ── Layout ── */
+  .main { display: flex; flex: 1; overflow: hidden; }
+
+  /* ── Canvas ── */
+  #canvas-wrap {
+    flex: 1;
+    overflow: auto;
+    background: var(--cream);
+    background-image:
+      radial-gradient(circle at 20% 20%, rgba(201,168,76,.06) 0%, transparent 60%),
+      radial-gradient(circle at 80% 80%, rgba(106,154,176,.06) 0%, transparent 60%);
+    padding: 2.5rem;
+    position: relative;
+  }
+  #tree-svg { display: block; }
+
+  /* Empty state */
+  #empty-state {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: .8rem; pointer-events: none;
+    opacity: .45;
+  }
+  #empty-state .big { font-size: 3rem; }
+  #empty-state p { font-family: 'Playfair Display', serif; font-size: 1.1rem; color: var(--brown-lt); }
+
+  /* SVG nodes */
+  .nm rect, .nf rect, .nu rect { fill: #EDE5D8; stroke: var(--border); stroke-width: 1.2; }
+  .nm rect, .nf rect, .nu rect { rx: 10; filter: drop-shadow(0 2px 4px rgba(44,20,10,.10)); }
+  .nname { font-family: 'Playfair Display', serif; font-weight: 600; fill: var(--ink); }
+  .nrole { font-family: 'DM Sans', sans-serif; fill: var(--ink-lt); }
+  .eline { fill: none; stroke: var(--border); stroke-width: 1.5; }
+  .spline { fill: none; stroke: var(--rose-lt); stroke-width: 1.5; stroke-dasharray: 5 3; }
+
+  /* ── Side panel ── */
+  #side-panel {
+    width: 280px;
+    min-width: 250px;
+    background: #fff;
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    box-shadow: -4px 0 18px rgba(44,20,10,.06);
+  }
+  .panel-header {
+    background: var(--parchment);
+    padding: 1.1rem 1.3rem .9rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .panel-header h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--brown);
+    margin-bottom: .1rem;
+  }
+  .panel-header p { font-size: .75rem; color: var(--ink-lt); font-weight: 300; }
+
+  .panel-body { padding: 1.2rem; flex: 1; overflow-y: auto; }
+
+  .field { margin-bottom: .9rem; }
+  .field label {
+    display: block;
+    font-size: .72rem;
+    font-weight: 500;
+    color: var(--brown-lt);
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    margin-bottom: .35rem;
+  }
+  .field input, .field select {
+    width: 100%;
+    font-family: 'DM Sans', sans-serif;
+    font-size: .88rem;
+    padding: .6rem .8rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--cream);
+    color: var(--ink);
+    outline: none;
+    transition: border-color .18s, box-shadow .18s;
+    appearance: none;
+  }
+  .field input:focus, .field select:focus {
+    border-color: var(--brown-lt);
+    box-shadow: 0 0 0 3px rgba(92,61,46,.10);
+  }
+  .select-wrap { position: relative; }
+  .select-wrap::after {
+    content: '▾';
+    position: absolute; right: .8rem; top: 50%; transform: translateY(-50%);
+    color: var(--brown-lt); pointer-events: none; font-size: .8rem;
+  }
+
+  .btn-add {
+    width: 100%;
+    font-family: 'DM Sans', sans-serif;
+    font-size: .9rem;
+    font-weight: 500;
+    padding: .7rem;
+    background: var(--brown);
+    color: var(--cream);
+    border: none;
+    border-radius: 9px;
+    cursor: pointer;
+    transition: background .18s, transform .1s;
+    letter-spacing: .03em;
+    margin-bottom: .7rem;
+  }
+  .btn-add:hover { background: var(--brown-lt); }
+  .btn-add:active { transform: scale(.98); }
+
+  .btn-reset {
+    width: 100%;
+    font-family: 'DM Sans', sans-serif;
+    font-size: .82rem;
+    font-weight: 400;
+    padding: .55rem;
+    background: transparent;
+    color: var(--ink-lt);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    cursor: pointer;
+    transition: background .18s;
+  }
+  .btn-reset:hover { background: var(--parchment); }
+
+  #msg {
+    margin-top: .6rem;
+    font-size: .78rem;
+    color: #C0392B;
+    min-height: 1.1rem;
+    font-weight: 400;
+  }
+
+  .divider {
+    border: none; border-top: 1px solid var(--border);
+    margin: 1rem 0;
+  }
+
+  .member-list-title {
+    font-size: .72rem;
+    font-weight: 500;
+    color: var(--brown-lt);
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    margin-bottom: .6rem;
+  }
+  .member-list { display: flex; flex-direction: column; gap: .3rem; }
+  .member-chip {
+    display: flex; align-items: center; gap: .5rem;
+    padding: .45rem .65rem;
+    border-radius: 7px;
+    background: var(--cream);
+    border: 1px solid var(--border);
+    font-size: .82rem;
+  }
+  .member-chip .dot {
+    width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
+  }
+  .dot-m { background: var(--sky); }
+  .dot-f { background: var(--rose); }
+  .dot-u { background: var(--border); }
+  .member-chip .mname { font-weight: 500; color: var(--ink); flex: 1; }
+  .member-chip { cursor: pointer; transition: background .15s, border-color .15s; }
+  .member-chip:hover { background: #fff; border-color: var(--brown-lt); }
+  .member-chip.editing { background: #fff; border-color: var(--brown); box-shadow: 0 0 0 2px rgba(92,61,46,.12); cursor: default; }
+  .member-chip .edit-input {
+    flex: 1; border: none; outline: none; background: transparent;
+    font-family: 'DM Sans', sans-serif; font-size: .82rem; font-weight: 500;
+    color: var(--ink); padding: 0; min-width: 0;
+  }
+  .member-chip .edit-actions { display: flex; gap: .3rem; margin-left: auto; flex-shrink: 0; }
+  .edit-btn {
+    border: none; border-radius: 5px; padding: .18rem .48rem;
+    font-size: .72rem; font-weight: 500; cursor: pointer; line-height: 1.5;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .edit-btn.save { background: var(--brown); color: var(--cream); }
+  .edit-btn.save:hover { background: var(--brown-lt); }
+  .edit-btn.cancel { background: var(--parchment); color: var(--ink-lt); }
+  .edit-btn.cancel:hover { background: var(--border); }
+  .pencil { font-size: .7rem; margin-left: auto; opacity: 0; transition: opacity .15s; color: var(--brown-lt); }
+  .member-chip:hover .pencil { opacity: 1; }
+
+  /* Responsive: collapse panel on small screens */
+  @media (max-width: 640px) {
+    .main { flex-direction: column-reverse; }
+    #side-panel { width: 100%; min-width: unset; border-left: none; border-top: 1px solid var(--border); max-height: 44vh; }
+    #canvas-wrap { min-height: 40vh; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1><span class="leaf">🌳</span> Family Tree</h1>
+</header>
+
+<div class="main">
+  <!-- Canvas -->
+  <div id="canvas-wrap">
+    <div id="empty-state" style="display:none">
+      <div class="big">🌱</div>
+      <p>Your family tree will appear here</p>
+    </div>
+    <svg id="tree-svg"></svg>
+  </div>
+
+  <!-- Side Panel -->
+  <div id="side-panel">
+    <div class="panel-header">
+      <h2>Add a Member</h2>
+      <p>Connect a new person to the tree</p>
+    </div>
+    <div class="panel-body">
+      <div class="field">
+        <label>Name</label>
+        <input id="iname" type="text" placeholder="e.g. Kenzo" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>Relation</label>
+        <div class="select-wrap">
+          <select id="irel">
+            <option value="">— select —</option>
+            <option>Spouse</option>
+            <option>Father</option>
+            <option>Mother</option>
+            <option>Sibling</option>
+            <option>Child</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label>Relation to</label>
+        <div class="select-wrap">
+          <select id="ito"></select>
+        </div>
+      </div>
+      <button class="btn-add" onclick="addMember()">+ Add to Tree</button>
+      <button class="btn-reset" onclick="resetTree()">↺ Reset to Default</button>
+      <div id="msg"></div>
+
+      <hr class="divider">
+      <div class="member-list-title">Members (<span id="count">0</span>)</div>
+      <div class="member-list" id="member-list"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── Data ────────────────────────────────────────────────────────────────────
+const DEF={
+  persons:[
+    {id:'p1',name:'Rohit', gender:'m',spouseId:'p2',parentIds:[],childIds:['p3'],gen:0,sibGroupId:'sg1'},
+    {id:'p2',name:'Alison',gender:'f',spouseId:'p1',parentIds:[],childIds:['p3'],gen:0,sibGroupId:'sg1'},
+    {id:'p3',name:'Keifer',gender:'u',spouseId:null, parentIds:['p1','p2'],childIds:[],gen:1,sibGroupId:null},
+  ],
+  nextId:4,nextSg:2
+};
+let D=clone(DEF);
+function clone(o){return JSON.parse(JSON.stringify(o))}
+function get(id){return D.persons.find(p=>p.id===id)}
+function newId(){return 'p'+(D.nextId++)}
+function newSg(){return 'sg'+(D.nextSg++)}
+
+function save(){try{localStorage.setItem('familytree_v5',JSON.stringify(D))}catch(e){}}
+function load(){try{const r=localStorage.getItem('familytree_v5');if(r)D=JSON.parse(r)}catch(e){}}
+
+// ─── Add logic ────────────────────────────────────────────────────────────────
+function addMember(){
+  const name=document.getElementById('iname').value.trim();
+  const rel=document.getElementById('irel').value;
+  const toId=document.getElementById('ito').value;
+  const msg=document.getElementById('msg');
+  msg.textContent='';
+  if(!name){msg.textContent='Please enter a name.';return}
+  if(!rel){msg.textContent='Please select a relation.';return}
+  if(!toId){msg.textContent='Please select a person.';return}
+  const anchor=get(toId);if(!anchor){msg.textContent='Person not found.';return}
+  const id=newId();
+  const gMap={Father:'m',Mother:'f',Spouse:anchor.gender==='m'?'f':'m'};
+  const gender=gMap[rel]||'u';
+
+  if(rel==='Spouse'){
+    if(anchor.spouseId){msg.textContent=anchor.name+' already has a spouse.';return}
+    const p={id,name,gender,spouseId:anchor.id,parentIds:[],childIds:[...anchor.childIds],gen:anchor.gen,sibGroupId:anchor.sibGroupId};
+    anchor.spouseId=id;
+    anchor.childIds.forEach(cid=>{const c=get(cid);if(c&&!c.parentIds.includes(id))c.parentIds.push(id)});
+    D.persons.push(p);
+  }else if(rel==='Sibling'){
+    let sg=anchor.sibGroupId;
+    if(!sg){sg=newSg();anchor.sibGroupId=sg;if(anchor.spouseId){const sp=get(anchor.spouseId);if(sp)sp.sibGroupId=sg}}
+    const p={id,name,gender,spouseId:null,parentIds:[...anchor.parentIds],childIds:[],gen:anchor.gen,sibGroupId:sg};
+    anchor.parentIds.forEach(pid=>{const par=get(pid);if(par&&!par.childIds.includes(id))par.childIds.push(id)});
+    D.persons.push(p);
+  }else if(rel==='Child'){
+    const parentIds=[anchor.id];if(anchor.spouseId)parentIds.push(anchor.spouseId);
+    const p={id,name,gender,spouseId:null,parentIds,childIds:[],gen:anchor.gen+1,sibGroupId:null};
+    anchor.childIds.push(id);
+    if(anchor.spouseId){const sp=get(anchor.spouseId);if(sp&&!sp.childIds.includes(id))sp.childIds.push(id)}
+    D.persons.push(p);
+  }else if(rel==='Father'||rel==='Mother'){
+    const ag=anchor.gen;
+    D.persons.forEach(p=>{if(p.gen>=ag)p.gen+=1});
+    const p={id,name,gender,spouseId:null,parentIds:[],childIds:[anchor.id],gen:ag,sibGroupId:null};
+    if(!anchor.parentIds.includes(id))anchor.parentIds.push(id);
+    const other=anchor.parentIds.filter(pid=>pid!==id).map(pid=>get(pid))
+      .find(q=>q&&!q.spouseId&&q.gender!==gender);
+    if(other){p.spouseId=other.id;other.spouseId=id;other.gen=ag;
+      if(!other.sibGroupId&&!p.sibGroupId){const sg=newSg();p.sibGroupId=sg;other.sibGroupId=sg}}
+    D.persons.push(p);
+  }
+
+  save();render();populateTo();updateMemberList();
+  document.getElementById('iname').value='';
+  document.getElementById('irel').value='';
+}
+
+function resetTree(){
+  if(!confirm('Reset to the default family (Rohit, Alison, Keifer)?'))return;
+  D=clone(DEF);save();render();populateTo();updateMemberList();
+}
+
+// ─── Layout with crossing minimisation ───────────────────────────────────────
+function buildLayout(){
+  if(!D.persons.length)return{pos:{},NW:96,NH:52,VG:80};
+  const maxGen=Math.max(...D.persons.map(p=>p.gen));
+  const byGen={};
+  for(let g=0;g<=maxGen;g++)byGen[g]=[];
+  D.persons.forEach(p=>(byGen[p.gen]=byGen[p.gen]||[]).push(p.id));
+
+  const maxInRow=Math.max(...Object.values(byGen).map(a=>a.length),1);
+  const NW=Math.max(68,Math.min(104,Math.floor(880/maxInRow)-14));
+  const NH=NW<=78?42:50;
+  const HG=Math.max(10,Math.min(22,Math.floor(130/maxInRow)));
+  const VG=88;
+  const FS=NW<=80?11:13;
+  const FSR=9;
+
+  // ── 1. Build couple-slots per generation ──────────────────────────────────
+  // A "slot" is [personId] or [personId, spouseId] — treated as an atomic unit
+  const slotsByGen={};
+  for(let g=0;g<=maxGen;g++){
+    const ids=byGen[g]||[];
+    const seen=new Set();const slots=[];
+    ids.forEach(id=>{
+      if(seen.has(id))return;seen.add(id);
+      const p=get(id);const slot=[id];
+      if(p.spouseId&&ids.includes(p.spouseId)&&!seen.has(p.spouseId)){
+        seen.add(p.spouseId);
+        const sp=get(p.spouseId);
+        // male left of female
+        if(p.gender==='f'&&sp?.gender==='m'){slot[0]=p.spouseId;slot[1]=id;}
+        else slot.push(p.spouseId);
+      }
+      slots.push(slot);
+    });
+    slotsByGen[g]=slots;
+  }
+
+  // Helper: get all children of a slot (persons in next gen whose parentIds overlap slot)
+  function slotChildren(slot,g){
+    return D.persons.filter(c=>c.gen===g+1&&c.parentIds.some(pid=>slot.includes(pid)));
+  }
+  // Helper: get all parents of a slot-node (persons in prev gen)
+  function slotParentSlots(slot,g,slotsAbove){
+    const parentIds=new Set(slot.flatMap(id=>get(id).parentIds));
+    return slotsAbove.filter(s=>s.some(id=>parentIds.has(id)));
+  }
+
+  // ── 2. Crossing-minimisation: reorder slots using barycentric heuristic ──
+  // We do multiple sweeps top-down then bottom-up, ordering slots by the
+  // average position of their connected nodes in the adjacent layer.
+  // We use a temporary "rank" (slot index) as a proxy for position.
+
+  // Initialise slot order by existing array order
+  for(let g=0;g<=maxGen;g++) slotsByGen[g]=[...slotsByGen[g]];
+
+  // Assign temporary x ranks (just slot index × 1000 as proxy)
+  const rank={}; // id -> float rank
+  const assignRanks=g=>{
+    slotsByGen[g].forEach((slot,si)=>slot.forEach(id=>rank[id]=si*1000+(slot.indexOf(id)*100)));
+  };
+  for(let g=0;g<=maxGen;g++) assignRanks(g);
+
+  // Barycenter of a slot relative to connected layer
+  const bary=(slot,g,direction)=>{
+    let connected=[];
+    if(direction==='down'){ // order by children's rank
+      connected=slotChildren(slot,g).map(c=>rank[c.id]);
+    } else { // order by parents' rank
+      const parentIds=slot.flatMap(id=>get(id).parentIds);
+      connected=parentIds.map(pid=>rank[pid]).filter(v=>v!=null);
+    }
+    if(!connected.length) return Infinity; // no connection: keep at end
+    return connected.reduce((a,b)=>a+b,0)/connected.length;
+  };
+
+  // Run 4 alternating sweeps (top-down, bottom-up) × 2
+  for(let pass=0;pass<4;pass++){
+    if(pass%2===0){
+      // Top-down: order each row by parents' positions
+      for(let g=1;g<=maxGen;g++){
+        slotsByGen[g].sort((a,b)=>bary(a,g,'up')-bary(b,g,'up'));
+        assignRanks(g);
+      }
+    } else {
+      // Bottom-up: order each row by children's positions
+      for(let g=maxGen-1;g>=0;g--){
+        slotsByGen[g].sort((a,b)=>bary(a,g,'down')-bary(b,g,'down'));
+        assignRanks(g);
+      }
+    }
+  }
+
+  // ── 3. Assign real x positions ────────────────────────────────────────────
+  const pos={};
+  // y is strictly gen-based — never changes
+  D.persons.forEach(p=>{ pos[p.id]={x:0,y:p.gen*(NH+VG)}; });
+
+  // Place deepest row sequentially
+  (function placeSeq(g,startX=0){
+    let x=startX;
+    slotsByGen[g].forEach(slot=>{
+      slot.forEach((id,i)=>{ pos[id].x=x+i*(NW+HG); });
+      x+=slot.length*(NW+HG)+HG*2;
+    });
+  })(maxGen);
+
+  // Place each parent row by centring over children, then resolving collisions
+  for(let g=maxGen-1;g>=0;g--){
+    const slots=slotsByGen[g];
+
+    // Compute desired x for each slot (centre over its children)
+    const desired=slots.map(slot=>{
+      const ch=slotChildren(slot,g);
+      if(!ch.length) return{slot,x:null};
+      const xs=ch.map(c=>pos[c.id].x+NW/2);
+      const mid=(Math.min(...xs)+Math.max(...xs))/2;
+      const unitW=slot.length*(NW+HG)-HG;
+      return{slot,x:mid-unitW/2};
+    });
+
+    // Slots are already in crossing-minimised order; assign x left-to-right
+    // honouring desired positions and resolving overlaps
+    let cursor=0;
+    desired.forEach(({slot,x})=>{
+      const left=x===null?cursor:Math.max(cursor,x);
+      slot.forEach((id,i)=>{ pos[id].x=left+i*(NW+HG); });
+      cursor=left+slot.length*(NW+HG)+HG*2;
+    });
+  }
+
+  // ── 4. Safety overlap pass (each row, left to right) ─────────────────────
+  for(let g=0;g<=maxGen;g++){
+    const ids=[...(byGen[g]||[])].sort((a,b)=>pos[a].x-pos[b].x);
+    for(let i=1;i<ids.length;i++){
+      const prev=pos[ids[i-1]],cur=pos[ids[i]];
+      const need=prev.x+NW+HG;
+      if(cur.x<need){ const sh=need-cur.x; for(let j=i;j<ids.length;j++) pos[ids[j]].x+=sh; }
+    }
+  }
+
+  // ── 5. Gentle re-centre pass: nudge parents toward children if room allows ─
+  for(let g=maxGen-1;g>=0;g--){
+    slotsByGen[g].forEach(slot=>{
+      const ch=slotChildren(slot,g);if(!ch.length)return;
+      const xs=ch.map(c=>pos[c.id].x+NW/2);
+      const mid=(Math.min(...xs)+Math.max(...xs))/2;
+      const unitW=slot.length*(NW+HG)-HG;
+      const ideal=mid-unitW/2;
+      const rowIds=[...(byGen[g]||[])].sort((a,b)=>pos[a].x-pos[b].x);
+      const fi=rowIds.indexOf(slot[0]);
+      const li=rowIds.indexOf(slot[slot.length-1]);
+      const lo=fi>0?pos[rowIds[fi-1]].x+NW+HG:-Infinity;
+      const hi=li<rowIds.length-1?pos[rowIds[li+1]].x-HG-unitW:Infinity;
+      const clamped=Math.min(Math.max(ideal,lo),hi);
+      if(isFinite(clamped)) slot.forEach((id,i)=>{ pos[id].x=clamped+i*(NW+HG); });
+    });
+  }
+
+  // ── 6. Normalise minX = 0 ─────────────────────────────────────────────────
+  const allX=D.persons.map(p=>pos[p.id].x);
+  const minX=Math.min(...allX);
+  if(minX<0) D.persons.forEach(p=>{ pos[p.id].x-=minX; });
+
+  return{pos,NW,NH,HG,VG,FS,FSR};
+}
+
+// ─── Render ───────────────────────────────────────────────────────────────────
+function render(){
+  const svg=document.getElementById('tree-svg');
+  svg.innerHTML='';
+  const empty=document.getElementById('empty-state');
+  if(!D.persons.length){empty.style.display='flex';return}
+  empty.style.display='none';
+
+  const{pos,NW,NH,VG,FS,FSR}=buildLayout();
+  const PAD=40;
+  let maxX=0,maxY=0;
+  D.persons.forEach(p=>{const q=pos[p.id];if(!q)return;maxX=Math.max(maxX,q.x+NW);maxY=Math.max(maxY,q.y+NH)});
+  const W=maxX+PAD*2,H=maxY+PAD*2;
+  svg.setAttribute('width',Math.max(W,400));svg.setAttribute('height',H);
+
+  const ns='http://www.w3.org/2000/svg';
+  const el=(t,a={})=>{const e=document.createElementNS(ns,t);Object.entries(a).forEach(([k,v])=>e.setAttribute(k,v));return e};
+  const ox=PAD,oy=PAD;
+
+  // Spouse lines
+  const dsp=new Set();
+  D.persons.forEach(p=>{
+    if(!p.spouseId)return;
+    const k=[p.id,p.spouseId].sort().join('|');if(dsp.has(k))return;dsp.add(k);
+    const a=pos[p.id],b=pos[p.spouseId];if(!a||!b)return;
+    const ax=ox+(a.x<b.x?a.x+NW:a.x),bx=ox+(b.x<a.x?b.x+NW:b.x);
+    svg.appendChild(el('line',{x1:ax,y1:oy+a.y+NH/2,x2:bx,y2:oy+b.y+NH/2,class:'spline'}));
+  });
+
+  // Parent→child connectors
+  const de=new Set();
+  D.persons.forEach(child=>{
+    if(!child.parentIds.length||de.has(child.id))return;de.add(child.id);
+    const cp=pos[child.id];if(!cp)return;
+    const cx=ox+cp.x+NW/2,cy=oy+cp.y;
+    const ppts=child.parentIds.map(pid=>pos[pid]).filter(Boolean);if(!ppts.length)return;
+    const midPX=ppts.reduce((s,q)=>s+ox+q.x+NW/2,0)/ppts.length;
+    const midPY=oy+ppts[0].y+NH;
+    const ey=midPY+VG*0.42;
+    svg.appendChild(el('line',{x1:midPX,y1:midPY,x2:midPX,y2:ey,class:'eline'}));
+    if(Math.abs(midPX-cx)>1)svg.appendChild(el('line',{x1:midPX,y1:ey,x2:cx,y2:ey,class:'eline'}));
+    svg.appendChild(el('line',{x1:cx,y1:ey,x2:cx,y2:cy,class:'eline'}));
+  });
+
+  // Nodes
+  D.persons.forEach(p=>{
+    const q=pos[p.id];if(!q)return;
+    const x=ox+q.x,y=oy+q.y;
+    const cls=p.gender==='m'?'nm':p.gender==='f'?'nf':'nu';
+    const g=el('g',{class:cls});
+    const rect=el('rect',{x,y,width:NW,height:NH,rx:10});
+    g.appendChild(rect);
+    const nt=el('text',{'text-anchor':'middle','dominant-baseline':'central',class:'nname','font-size':FS,x:x+NW/2,y:y+NH/2});
+    nt.textContent=p.name;g.appendChild(nt);
+    svg.appendChild(g);
+  });
+}
+
+function populateTo(){
+  const s=document.getElementById('ito');s.innerHTML='';
+  D.persons.forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=p.name;s.appendChild(o)});
+}
+
+function updateMemberList(){
+  const list=document.getElementById('member-list');
+  const count=document.getElementById('count');
+  count.textContent=D.persons.length;
+  list.innerHTML='';
+  D.persons.forEach(p=>{
+    const chip=document.createElement('div');
+    chip.className='member-chip';
+    chip.dataset.id=p.id;
+
+    const dot=document.createElement('span');
+    dot.className='dot dot-u';
+
+    const nm=document.createElement('span');
+    nm.className='mname';
+    nm.textContent=p.name;
+
+    const pencil=document.createElement('span');
+    pencil.className='pencil';
+    pencil.textContent='✏';
+
+    chip.appendChild(dot);
+    chip.appendChild(nm);
+    chip.appendChild(pencil);
+
+    chip.addEventListener('click',()=>startEdit(chip,p.id));
+    list.appendChild(chip);
+  });
+}
+
+function startEdit(chip, id){
+  if(chip.classList.contains('editing'))return;
+  chip.classList.add('editing');
+  const p=get(id);
+
+  // Replace contents with input + buttons
+  chip.innerHTML='';
+
+  const dot=document.createElement('span');
+  dot.className='dot dot-u';
+
+  const input=document.createElement('input');
+  input.className='edit-input';
+  input.value=p.name;
+  input.type='text';
+  input.autocomplete='off';
+
+  const actions=document.createElement('div');
+  actions.className='edit-actions';
+
+  const saveBtn=document.createElement('button');
+  saveBtn.className='edit-btn save';
+  saveBtn.textContent='Save';
+
+  const cancelBtn=document.createElement('button');
+  cancelBtn.className='edit-btn cancel';
+  cancelBtn.textContent='✕';
+
+  actions.appendChild(saveBtn);
+  actions.appendChild(cancelBtn);
+  chip.appendChild(dot);
+  chip.appendChild(input);
+  chip.appendChild(actions);
+
+  input.focus();
+  input.select();
+
+  function doSave(){
+    const newName=input.value.trim();
+    if(!newName)return;
+    p.name=newName;
+    save();render();populateTo();updateMemberList();
+  }
+  function doCancel(){ updateMemberList(); }
+
+  saveBtn.addEventListener('click',e=>{e.stopPropagation();doSave()});
+  cancelBtn.addEventListener('click',e=>{e.stopPropagation();doCancel()});
+  input.addEventListener('keydown',e=>{
+    if(e.key==='Enter'){e.preventDefault();doSave()}
+    if(e.key==='Escape'){e.preventDefault();doCancel()}
+    e.stopPropagation();
+  });
+  // Stop chip click from re-triggering while editing
+  chip.addEventListener('click',e=>e.stopPropagation(),{once:false});
+}
+
+// Enter key submits
+document.getElementById('iname').addEventListener('keydown',e=>{if(e.key==='Enter')addMember()});
+
+load();render();populateTo();updateMemberList();
+</script>
+</body>
+</html>
